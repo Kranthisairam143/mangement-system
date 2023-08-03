@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Management System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background-color: #007bff;
+            color: #fff;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        form {
+            margin-bottom: 20px;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        input[type="tel"] {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+        }
+
+        button {
+            padding: 8px 16px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .error {
+            color: red;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Customer Management System</h1>
+    </header>
+
+    <div class="container">
+        <div id="login-screen">
+            <h2>Login</h2>
+            <form id="login-form">
+                <input type="text" id="login-id" placeholder="Login ID">
+                <input type="password" id="password" placeholder="Password">
+                <button type="button" onclick="authenticateUser()">Login</button>
+                <div id="login-error" class="error"></div>
+            </form>
+        </div>
+        <div id="customer-list-screen" style="display: none;">
+            <h2>Customer List</h2>
+            <table id="customer-table">
+                <thead>
+                    <tr>
+                        <th>First Name</th>
+                        <th>Last Name</th>
+                        <th>Street</th>
+                        <th>Address</th>
+                        <th>City</th>
+                        <th>State</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="customer-list"></tbody>
+            </table>
+            <button onclick="showAddCustomerScreen()">Add New Customer</button>
+        </div>
+        <div id="add-customer-screen" style="display: none;">
+            <h2>Add New Customer</h2>
+            <form id="add-customer-form">
+                <input type="text" id="first-name" placeholder="First Name">
+                <input type="text" id="last-name" placeholder="Last Name">
+                <input type="text" id="street" placeholder="Street">
+                <input type="text" id="address" placeholder="Address">
+                <input type="text" id="city" placeholder="City">
+                <input type="text" id="state" placeholder="State">
+                <input type="email" id="email" placeholder="Email">
+                <input type="tel" id="phone" placeholder="Phone">
+                <button type="button" onclick="createCustomer()">Save</button>
+                <button type="button" onclick="showCustomerListScreen()">Cancel</button>
+                <div id="add-customer-error" class="error"></div>
+            </form>
+        </div>
+    </div>
+    <script>
+        let token;
+
+        function authenticateUser() {
+            const loginId = document.getElementById("login-id").value;
+            const password = document.getElementById("password").value;
+            const loginError = document.getElementById("login-error");
+
+            fetch('<API_URL>', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        login_id: loginId,
+                        password: password
+                    }),
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Authentication failed');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    token = data.token;
+                    document.getElementById("login-screen").style.display = "none";
+                    showCustomerListScreen();
+                })
+                .catch(error => {
+                    loginError.textContent = "Invalid credentials. Please try again.";
+                });
+        }
+
+        function showCustomerListScreen() {
+
+            fetch('<API_URL>?cmd=get_customer_list', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + token
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to get customer list');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const customerList = document.getElementById("customer-list");
+                    customerList.innerHTML = "";
+
+                    data.forEach(customer => {
+                        const row = document.createElement("tr");
+                        row.innerHTML = `
+                        <td>${customer.first_name}</td>
+                        <td>${customer.last_name}</td>
+                        <td>${customer.street}</td>
+                        <td>${customer.address}</td>
+                        <td>${customer.city}</td>
+                        <td>${customer.state}</td>
+                        <td>${customer.email}</td>
+                        <td>${customer.phone}</td>
+                        <td>
+                            <button onclick="editCustomer('${customer.uuid}')">Edit</button>
+                            <button onclick="deleteCustomer('${customer.uuid}')">Delete</button>
+                        </td>
+                    `;
+                        customerList.appendChild(row);
+                    });
+
+                    document.getElementById("add-customer-screen").style.display = "none";
+                    document.getElementById("customer-list-screen").style.display = "block";
+                })
+                .catch(error => {
+                    console.error(error);
+                });
+        }
+
+        function showAddCustomerScreen() {
+            document.getElementById("add-customer-screen").style.display = "block";
+            document.getElementById("customer-list-screen").style.display = "none";
+        }
+
+        function createCustomer() {
+            const firstName = document.getElementById("first-name").value;
+            const lastName = document.getElementById("last-name").value;
+            const street = document.getElementById("street").value;
+            const address = document.getElementById("address").value;
+            const city = document.getElementById("city").value;
+            const state = document.getElementById("state").value;
+            const email = document.getElementById("email").value;
+            const phone = document.getElementById("phone").value;
+            const addCustomerError = document.getElementById("add-customer-error");
+            if (!firstName || !lastName) {
+                addCustomerError.textContent = "First Name and Last Name are mandatory.";
+                return;
+            }
+
+            fetch('<API_URL>?cmd=create', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        first_name: firstName,
+                        last_name: lastName,
+                        street: street,
+                        address: address,
+                        city: city,
+                        state: state,
+                        email: email,
+                        phone: phone
+                    }),
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => {
+                    if (response.status === 201) {
+                        showCustomerListScreen();
+                    } else if (response.status === 400) {
+                        addCustomerError.textContent = "First Name or Last Name is missing.";
+                    } else {
+                        throw new Error('Failed to create customer');
+                    }
+                })
+                .catch(error => {
+                    console.error(error);
+                });
+        }
+
+        function editCustomer(uuid) {}
+
+        function deleteCustomer(uuid) {
+
+            fetch('<API_URL>?cmd=delete&uuid=' + uuid, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + token
+                    }
+                })
+                .then(response => {
+                    if (response.status === 200) {
+                        showCustomerListScreen();
+                    } else if (response.status === 400) {
+                        throw new Error('UUID not found');
+                    } else {
+                        throw new Error('Failed to delete customer');
+                    }
+                })
+                .catch(error => {
+                    console.error(error);
+                });
+        }
+    </script>
+
+</body>
+
+</html>
